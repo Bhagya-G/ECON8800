@@ -1,0 +1,128 @@
+---
+title: "Week 3"
+author: "Bhagya Gunawardena"
+date: "20 March 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+#import data
+```{r getdata, message=FALSE,warning=FALSE}
+# clear environment
+rm(list = ls())
+# load libaries
+library(tidyverse)
+library(lubridate)
+
+#import data
+data_01 <- read.csv("data_01.csv", header = TRUE, sep = ",", quote = "\"",
+                    dec = ".", fill = TRUE, comment.char = "")
+```
+#Organize data
+
+```{r organizedata, message=FALSE,warning=FALSE}
+
+#select males
+data_02<-data_01%>%
+  filter(sex==1)
+
+#create dummies for education level
+data_02<-data_02%>%
+  mutate(edlvl = ifelse(deduc_1==1,1,ifelse(deduc_2==1,3,ifelse(deduc_3==1,4,ifelse(deduc_4==1,5,2)))))
+
+attach(data_02)
+
+#calculate the supply
+sy = 1964
+y=2017-sy+1
+
+
+wagein=which( colnames(data_02)=="lrwage" ) #to find the colum of wages 
+
+hs_data=array(0,dim = c(y,3))
+col_data=array(0,dim=c(y,3))
+colnames(hs_data)<-c("year","hs_supp","hs_wage")
+colnames(col_data)<-c("year","col_supp","col_wage")
+
+
+#assign data
+for (i in 1:y) {
+  hs_data[i,1]=sy+i-1
+  hs_data[i,2]=sum(edlvl==2 & year==(sy+i-1))
+  hs_data[i,3]=sum(data_02[which(edlvl==2&year==(sy+i-1)),wagein])
+  
+  
+  col_data[i,1]=sy+i-1
+  col_data[i,2]=sum((edlvl==4|edlvl==5) & year==(sy+i-1))
+  col_data[i,3]=sum(data_02[which((edlvl==4|edlvl==5)&year==(sy+i-1)),wagein])
+}
+
+hs_coldata<-merge(x=hs_data,y=col_data,by=c("year"))
+
+#relative supply and relative wage in each year
+hs_coldata<-hs_coldata%>%
+  mutate(colavgwage = col_wage/col_supp)%>%
+  mutate(hsavgwage = hs_wage/hs_supp)%>%
+  mutate(relsupp=col_supp/hs_supp)%>%
+ # mutate(relwage=col_wage/hs_wage)%>%
+  mutate(relwage=colavgwage/hsavgwage)%>%
+  mutate(ttime = year-1963)
+
+```
+"hs_coldata" has the required data for the analysis. Data is from 1964 as there is no data in 1963
+
+#Regression 1: From 1964-2017
+```{r reg1, message=FALSE,warning=FALSE}
+summary(reg1<-lm(log(relwage) ~ log(relsupp)+ttime,data=hs_coldata))
+
+```
+### Interpretation
+In this regression, all three regressors (intercept, log relative supply and tim) are highly significant small positive values. However, the results are different to the Kats and Murpgy results. One main reason will be the considering time period as they consider from 1963-1987 and we considerfrom 1964-2017.
+
+# Regression 2: 1964:1987
+```{r reg2, message=FALSE,warning=FALSE}
+summary(reg2<-lm(log(relwage) ~ log(relsupp)+ttime,data=subset(hs_coldata,year>=1964 & year<=1987)))
+
+```
+### Interpretation
+In this regression, only intercept and time are highly significant.Again, the results are different to the Kats and Murpgy results. One main reason will be the considering time period as they consider from 1963-1987 and we considerfrom 1964-2017, as we do not have data for year 1963.
+
+# Regression 3: 1988-2017
+```{r reg3, message=FALSE,warning=FALSE}
+hs_coldata<-hs_coldata%>%
+  mutate(tttime=ttime-24)
+
+summary(reg3<-lm(log(relwage) ~ log(relsupp)+tttime,data=subset(hs_coldata,year>=1988 & year<=2017)))
+
+```
+### Interpretation
+In this regression, only intercept and log relative supply are highly significant.However, the results are different to the Kats and Murpgy results. One main reason will be the considering time period as they consider from 1963-1987 and we considerfrom 1988-2017.
+
+#delete below... experiment..
+```{r blah,message=FALSE,warning=FALSE}
+hs_coldata<-hs_coldata%>%
+  # mutate(colavgwage = col_wage/col_supp)%>%
+  # mutate(hsavgwage = hs_wage/hs_supp)%>%
+  mutate(relsupp1=hs_supp/col_supp)%>%
+ # mutate(relwage=col_wage/hs_wage)%>%
+  mutate(relwage1=hsavgwage/colavgwage)#%>%
+  #mutate(ttime = year-1963)
+
+
+```
+```{r reg11, message=FALSE,warning=FALSE}
+summary(reg11<-lm(log(relwage1) ~ log(relsupp1)+ttime,data=hs_coldata))
+
+```
+```{r reg21, message=FALSE,warning=FALSE}
+summary(reg21<-lm(log(relwage1) ~ log(relsupp1)+ttime,data=subset(hs_coldata,year>=1964 & year<=1987)))
+
+```
+```{r reg31, message=FALSE,warning=FALSE}
+summary(reg31<-lm(log(relwage1) ~ log(relsupp1)+ttime,data=subset(hs_coldata,year>=1988 & year<=2017)))
+
+```
+
